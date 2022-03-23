@@ -13,6 +13,12 @@ Updated 3/14/2022 - Run code for b = 4, 1, 0.25 and stored in the triptych.pdf f
 Updated 3/15/2022 - Placed analytical solver and plotting code in functions for easier application.
 
 Update 3/16/2022 - Added the analytical solution for the pdf of phi as a function, generate pdf. 
+
+Update 3/18/2022 - Added numerical solution for the acetate and methane equations and adjusted the equations as recorded in the slides. 
+Still unsure if these are the right equations to use -- will consult with Xue on Tuesday. 
+
+Update 3/23/2022 - Adjustments made to the equations so they are now correct and include the solution for emissions. They are currently in the 
+dimensional form. 
 """
 import math 
 import numpy as np
@@ -28,18 +34,18 @@ import matplotlib.pyplot as plt
 
 '''Parameters'''
 #General
-k1 = 0.7 #switching rate from state 1 to state 0
-k2 = 0.7 #switching rate from state 0 to state 1
+k1 = 1 #switching rate from state 1 to state 0
+k2 = 1 #switching rate from state 0 to state 1
 time = 30 #length of time
 dt = 0.1 #time step 
 
 #Data params
-k_p = 4
+k_p = 2
 k_ox = 1
-k_om = 10
-k_e = 7
+k_om = 6
+k_e = 0.2
 
-k_max = 20
+k_max = 1
 a_max = 1000
 
 #Nondimensionalized params
@@ -209,27 +215,168 @@ plt.legend(loc = 'upper center')
 
 plt.savefig(r"C:\Users\marie\Desktop\Feng Research\Figures\Dichotomous Modeling Figures\betapdf.pdf")
 #%%
-
 ##############################################################################
 ######### NUMERICAL SOLUTION - METHANE AND ACETATE ###########################
 ##############################################################################
 
+'''Equation Solver'''
+
+def ma_equations_dim(a, m, noise, kp = k_p, kox = k_ox, kom = k_om, e = e):
+    #Takes in all values necessary for solving the coupled equations for a given acetate and metane concetration
+    #and then returns a 3x1 vector containing the values of d[m]dt and d[a]dt and dEdt
+    #Input: a - acetate concentration
+    #       m - methane concentration 
+    #       k_p - Methane production rate constant (1/t)
+    #       k_ox - Methane oxidation production rate constant (1/t)
+    #       k_om - Acetate fermentation rate constant (1/t)
+    #       e - Emission constant (dimensionless)
+    #       noise - the current value for dichotomous noise, either 1 or -1. 
+    #Output: sol - a vector containing the values of d[m]dt and d[a]dt and dEdt
+    
+    sol = []
+    
+    dm = 0.5*(kp*a*(1-m) - kox*m*(1-e)) + 0.5*(kp*a*(1-m) + kox*m*(1-e))*noise
+    da = 0.5*(kom*(1-a) - kp*a*(1-m)) - 0.5*(kom*(1-a) + kp*a*(1 - m))*noise
+    de = 0.5*(kox*e*m) - 0.5*(kox*e*m)*noise
+    
+    sol.append(da)
+    sol.append(dm)
+    sol.append(de)
+    
+    return np.array(sol)
+
+'''Runge Kutta Method'''
+def rk4_solve_ma(m_init, a_init, step, noise, kp = k_p, kox = k_ox, kom = k_om, e = e):
+    
+    s = pd.DataFrame({'Time': noise.x,
+                      'Noise': noise.noise, 
+                      'Acetate': np.zeros(len(noise.x)), 
+                      'Methane': np.zeros(len(noise.x)),
+                      'Emission': np.zeros(len(noise.x))})
+    
+    #Set initial conditions - Initial emission is left at 0
+    s.Acetate[0], s.Methane[0],  = a_init, m_init
+    
+    for i in range(1, len(noise)):
+        v = np.array([s.Acetate[i-1], s.Methane[i-1], s.Emission[i-1]])
+        v1 = ma_equations_dim(v[0], v[1], s.Noise[i-1], kp = k_p, kox = k_ox, kom = k_om, e = e)
+        tv = v + ((0.5*step)*v1)
+        v2 = ma_equations_dim(tv[0], tv[1], s.Noise[i-1], kp = k_p, kox = k_ox, kom = k_om, e = e)
+        tv = v + ((0.5*step)*v2)
+        v3 = ma_equations_dim(tv[0], tv[1], s.Noise[i-1], kp = k_p, kox = k_ox, kom = k_om, e = e)
+        tv = v + step*v3
+        v4 = ma_equations_dim(tv[0], tv[1], s.Noise[i-1], kp = k_p, kox = k_ox, kom = k_om, e = e)
+        
+        solution = v + (step/6)*(v1 + 2*v2 + 2*v3 + v4)
+        
+        #Assign values back to dataframe
+        s.Acetate[i], s.Methane[i], s.Emission[i] = solution[0], solution[1], solution[2]   
+        
+    return s
+
+#Run algorithm
+storage = rk4_solve_ma(0.5, 0.5, dt, noise, kp = k_p, kox = k_ox, kom = k_om, e = e)
+
+storage["dEdt"] = np.concatenate(([0], np.diff(storage.Emission)))
+
+#%%
+'''Plot Solution'''
+fig, ax = plt.subplots(3, 1, figsize=(7, 11))
+
+ax[0].step(noise.x, noise.noise)
+ax[0].set(xlim = (0, time))
+ax[0].set(xlabel = ' ', ylabel = r'$\xi(t)$') 
+
+ax[1].plot(storage.Time, storage.Acetate, label = 'Acetate')
+ax[1].plot(storage.Time, storage.Methane, label = 'Methane')
+ax[1].set(xlim = (0, 30), xlabel = ' ', ylabel = r'$[\phi]$')
+ax[1].legend(loc = 'lower left')
+
+ax[2].plot(storage.Time, storage.dEdt, label = 'Emission Rate', color = 'green')
+ax[2].set(xlim = (0, 30), xlabel = 'Time [t]', ylabel = r'Emission Rate, $\frac{dE}{dt}$')
+
+#%%
+'''Empirical PDF and CDF'''
+
+### Empirical cdf
+fig, ax = plt.subplots()
+n, bins, patches = ax.hist(storage.Methane, 50, density = True, histtype = 'step', cumulative = True)
+n, bins, patches = ax.hist(storage.Acetate, 50, density = True, histtype = 'step', cumulative = True)
+ax.set_xlabel(r'$[\phi]$')
+ax.set_ylabel('Cumulative density')
+plt.title("Empirical CDF of coupled Methane and Acetate")
+plt.xlim(0, 1)
+plt.legend(['Methane', 'Acetate'], loc = "upper left")
+
+### Empirical pdf
+fig, ax = plt.subplots()
+ax.hist(storage.Methane, 50, density = True)
+ax.hist(storage.Acetate, 50, density = True)
+ax.set_xlabel(r'$[\phi]$')
+ax.set_ylabel('Probability density')
+plt.title("Empirical PDF of coupled Methane and Acetate")
+plt.xlim(0, 1)
+plt.legend(['Methane', 'Acetate'], loc = "upper left")
 
 
+#%%
+'''Simgle vs. Coupled Methane'''
 
+### Empirical cdf
+fig, ax = plt.subplots()
+n, bins, patches = ax.hist(storage.Methane, 50, density = True, histtype = 'step', cumulative = True)
+n, bins, patches = ax.hist(noise_4.phi_a, 50, density = True, histtype = 'step', cumulative = True)
+ax.set_xlabel(r'$[M]$')
+ax.set_ylabel('Cumulative density')
+plt.title("Empirical CDF of methane from coupled and uncoupled solutions")
+plt.xlim(0, 1)
+plt.legend(['Coupled', 'Uncoupled'], loc = "upper left")
 
+#%%
 
+##############################################################################
+######### ANALYSIS OF NUMERICAL SOLUTION FOR EMISSION ########################
+##############################################################################
+steps = 20
 
+#Range of k values to test
+X, Y = np.linspace(0.01, 0.99, steps), np.linspace(0.01, 0.99, steps)
+Z = np.empty((steps, steps))
 
+for i in range(0, steps):
+    for j in range(0, steps):
+        print("K1 is " + str(X[i]) + " and K2 is " + str(Y[j]))
+        #Generate noise
+        n = generate_noise(X[i], Y[j], 10, dt)
+        
+        #Run numerical solutions
+        s = rk4_solve_ma(0.5, 0.5, dt, n, kp = k_p, kox = k_ox, kom = k_om, e = e)
+        s["dEdt"] = np.concatenate(([0], np.diff(s.Emission)))
 
+        #Take the average dEdt
+        e_bar = s.dEdt.mean()
+        e_max = s.Emission.max()
+        
+        #Test print
+        print("The mean emission rate is " + str(e_bar) + " and the max emission is " + str(e_max))
+        
+        #Assign to the grid space
+        Z[i, j] = e_bar
 
+#%%
+'''Plot the dEdt bar Contour'''
 
+fig, ax = plt.subplots()
+contour = ax.contourf(X, Y, Z, cmap = 'OrRd')
+ax.set_xlabel(r'$k_1$')
+ax.set_ylabel(r'$k_2$')
+plt.title("Average emissions rate")
+plt.xlim(0.01, 0.99)
+plt.ylim(0.01, 0.99)
+plt.colorbar(contour).set_label(r'Average $\frac{dE}{dt}$')
+plt.show()
 
-
-
-
-
-
+#%%
 
 
 
