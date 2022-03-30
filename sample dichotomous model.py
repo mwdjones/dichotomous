@@ -18,7 +18,8 @@ Update 3/18/2022 - Added numerical solution for the acetate and methane equation
 Still unsure if these are the right equations to use -- will consult with Xue on Tuesday. 
 
 Update 3/23/2022 - Adjustments made to the equations so they are now correct and include the solution for emissions. They are currently in the 
-dimensional form. 
+dimensional form. Numerical analysis added to compute the emissions for an array of possible k1 and k2 values.
+
 """
 import math 
 import numpy as np
@@ -68,7 +69,7 @@ def generate_noise(k1, k2, num, step):
     switch = []
 
     #Generate random switching
-    for i in range(0, num+10): #buffer
+    for i in range(0, num+50): #buffer
         if i%2 == 0:
             switch.append(-np.ones(int(np.random.exponential(1/k2, 1)/step)))
         else:
@@ -281,19 +282,21 @@ storage["dEdt"] = np.concatenate(([0], np.diff(storage.Emission)))
 
 #%%
 '''Plot Solution'''
-fig, ax = plt.subplots(3, 1, figsize=(7, 11))
+fig, ax = plt.subplots(2, 1, figsize=(6, 5))
 
-ax[0].step(noise.x, noise.noise)
-ax[0].set(xlim = (0, time))
-ax[0].set(xlabel = ' ', ylabel = r'$\xi(t)$') 
+#ax[0].step(noise.x, noise.noise)
+#ax[0].set(xlim = (0, time))
+#ax[0].set(xlabel = ' ', ylabel = r'$\xi(t)$') 
 
-ax[1].plot(storage.Time, storage.Acetate, label = 'Acetate')
-ax[1].plot(storage.Time, storage.Methane, label = 'Methane')
-ax[1].set(xlim = (0, 30), xlabel = ' ', ylabel = r'$[\phi]$')
-ax[1].legend(loc = 'lower left')
+ax[0].plot(storage.Time, storage.Acetate, label = 'Acetate')
+ax[0].plot(storage.Time, storage.Methane, label = 'Methane')
+ax[0].set(xlim = (0, 30), xlabel = ' ', ylabel = r'$[\phi]$')
+ax[0].legend(loc = 'lower left')
 
-ax[2].plot(storage.Time, storage.dEdt, label = 'Emission Rate', color = 'green')
-ax[2].set(xlim = (0, 30), xlabel = 'Time [t]', ylabel = r'Emission Rate, $\frac{dE}{dt}$')
+ax[1].plot(storage.Time, storage.dEdt, label = 'Emission Rate', color = 'green')
+ax[1].set(xlim = (0, 30), xlabel = 'Time [t]', ylabel = r'Emission Rate, $\frac{dE}{dt}$')
+
+plt.savefig(r"C:\Users\marie\Desktop\Feng Research\Figures\Dichotomous Modeling Figures\numSolution.pdf")
 
 #%%
 '''Empirical PDF and CDF'''
@@ -308,6 +311,8 @@ plt.title("Empirical CDF of coupled Methane and Acetate")
 plt.xlim(0, 1)
 plt.legend(['Methane', 'Acetate'], loc = "upper left")
 
+plt.savefig(r"C:\Users\marie\Desktop\Feng Research\Figures\Dichotomous Modeling Figures\numCDF.pdf")
+
 ### Empirical pdf
 fig, ax = plt.subplots()
 ax.hist(storage.Methane, 50, density = True)
@@ -317,6 +322,8 @@ ax.set_ylabel('Probability density')
 plt.title("Empirical PDF of coupled Methane and Acetate")
 plt.xlim(0, 1)
 plt.legend(['Methane', 'Acetate'], loc = "upper left")
+
+plt.savefig(r"C:\Users\marie\Desktop\Feng Research\Figures\Dichotomous Modeling Figures\numPDF.pdf")
 
 
 #%%
@@ -332,54 +339,89 @@ plt.title("Empirical CDF of methane from coupled and uncoupled solutions")
 plt.xlim(0, 1)
 plt.legend(['Coupled', 'Uncoupled'], loc = "upper left")
 
+plt.savefig(r"C:\Users\marie\Desktop\Feng Research\Figures\Dichotomous Modeling Figures\coupledUncoupled.pdf")
+
 #%%
 
 ##############################################################################
 ######### ANALYSIS OF NUMERICAL SOLUTION FOR EMISSION ########################
 ##############################################################################
-steps = 20
+steps = 200
 
 #Range of k values to test
 X, Y = np.linspace(0.01, 0.99, steps), np.linspace(0.01, 0.99, steps)
-Z = np.empty((steps, steps))
+Z = np.empty((steps, steps)) #Solve then Average
+Z2 = np.empty((steps, steps)) #Average then Solve
+
+Z_mbar = np.empty((steps, steps))
+Z_nbar = np.empty((steps, steps))
 
 for i in range(0, steps):
     for j in range(0, steps):
-        print("K1 is " + str(X[i]) + " and K2 is " + str(Y[j]))
+        #print("K1 is " + str(X[i]) + " and K2 is " + str(Y[j]))
         #Generate noise
         n = generate_noise(X[i], Y[j], 10, dt)
         
         #Run numerical solutions
         s = rk4_solve_ma(0.5, 0.5, dt, n, kp = k_p, kox = k_ox, kom = k_om, e = e)
-        s["dEdt"] = np.concatenate(([0], np.diff(s.Emission)))
 
+        #################
+        
         #Take the average dEdt
+        s["dEdt"] = np.concatenate(([0], np.diff(s.Emission)))
         e_bar = s.dEdt.mean()
         e_max = s.Emission.max()
-        
-        #Test print
-        print("The mean emission rate is " + str(e_bar) + " and the max emission is " + str(e_max))
-        
+
         #Assign to the grid space
         Z[i, j] = e_bar
+        
+        #################
+        
+        #Take the average of methane and noise
+        m_bar = s.Methane.mean()
+        n_bar = s.Noise.mean()
+        
+        de_bar = (0.5*(k_ox*e*m_bar) - 0.5*(k_ox*e*m_bar)*n_bar)*0.1 #time step
+
+        #Assign to the grid space
+        Z2[i, j] = de_bar
+        
+        #################
+        Z_mbar[i, j] = m_bar
+        Z_nbar[i, j] = n_bar
 
 #%%
 '''Plot the dEdt bar Contour'''
+#Solved and THEN averaged
 
 fig, ax = plt.subplots()
-contour = ax.contourf(X, Y, Z, cmap = 'OrRd')
+contour = ax.contourf(X, Y, Z, cmap = 'OrRd', vmin = 0, vmax = 0.007)
 ax.set_xlabel(r'$k_1$')
 ax.set_ylabel(r'$k_2$')
 plt.title("Average emissions rate")
 plt.xlim(0.01, 0.99)
 plt.ylim(0.01, 0.99)
 plt.colorbar(contour).set_label(r'Average $\frac{dE}{dt}$')
-plt.show()
+
+plt.savefig(r"C:\Users\marie\Desktop\Feng Research\Figures\Dichotomous Modeling Figures\heatmap.pdf")
+        
 
 #%%
+'''Plot the dEdt bar Contour'''
+#Averaged and THEN solved
 
+fig, ax = plt.subplots()
+contour = ax.contourf(X, Y, Z2, cmap = 'OrRd', vmin = 0, vmax = 0.007)
+ax.set_xlabel(r'$k_1$')
+ax.set_ylabel(r'$k_2$')
+plt.title("Average emissions rate")
+plt.xlim(0.01, 0.99)
+plt.ylim(0.01, 0.99)
+plt.colorbar(contour).set_label(r'Average $\frac{dE}{dt}$')
 
+plt.savefig(r"C:\Users\marie\Desktop\Feng Research\Figures\Dichotomous Modeling Figures\heatmap2.pdf")
 
+#%%
 
 
 
