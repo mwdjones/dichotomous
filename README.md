@@ -7,11 +7,9 @@ states across a threshold may create spikes in methane production.
 
 **Included Files**
 
-Codes:
+*sampledichotomousmodel.py* - Basic code for implemeting a completely synthetic dichotomous noise model including some preliminary sensitivity tests on changing switching constants
 
-sampledichotomousmodel.py - Basic code for implemeting a completely synthetic dichotomous noise model including some preliminary sensitivity tests on changing switching constants
-
-data-cleaning.py - parameterization of sensor data from wetland Ameriflux sites with both methane and water table data. 
+*data-cleaning.py* - parameterization of sensor data from wetland Ameriflux sites with both methane and water table data. 
 
 **Unpcoming work**
 
