@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime as dt
 
+#%%
+'''CA-SCB'''
+
 '''Import Data'''
 folder_path = "data/FLUXNET/CA-SCB/"
 
@@ -162,76 +165,216 @@ plt.ylabel('Normalized Turbulent CH4 Flux (Filled) [nmolCH4 m-2 s-1]')
 
 #%%
 '''Save data'''
-
 scb_daily.to_csv('data/cleaned/CA-SCB/CA-SCB_normalized.csv')
 
 #%%
-##########################################################################
-#################### PARAMETRIZE WATER TABLE DEPTH #######################
-##########################################################################
+'''JP-BBY'''
+'''Import Data'''
+folder_path = "data/FLUXNET/JP-BBY/"
 
-#Water Table Time series
-fig, ax = plt.subplots(figsize = (8, 6))
-plt.plot(scb_daily.TIMESTAMP, scb_daily.WTD_F)
-ax.set(ylabel = 'Water Table Depth (Filled) [m]')
+bby_daily = pd.read_csv(folder_path + 'FLX_JP-BBY_FLUXNET-CH4_DD_2015-2018_1-1.csv', 
+                        parse_dates = ['TIMESTAMP'], 
+                        na_values = (-9999))
 
-#Potential fluctuation thresholds
-thresh = [0.05, 0, -0.05, -0.1, -0.15, -0.2, -0.25]
+'''Sample Plot'''
+fig, ax1 = plt.subplots(figsize = (10, 8))
+ax1.plot(bby_daily.TIMESTAMP, bby_daily.WTD_F, color = 'lightgray')
+ax1.set(ylabel = 'Water Table Depth (Filled) [m]')
 
-#Select a bit of WTE data that contains no missing data. 
-WTD_sample = scb_daily.WTD_F[516:1247].dropna()
+ax2 = ax1.twinx()
+ax2.plot(bby_daily.TIMESTAMP, bby_daily.FCH4_F, color = 'orange')
+ax2.set(ylabel = 'Turbulent CH4 Flux (Filled) [nmolCH4 m-2 s-1]')
 
-fig, ax = plt.subplots(figsize = (8, 5))
-plt.plot(WTD_sample, zorder = 5, color = 'lightgray')
-#for i in thresh:
-#    plt.axhline(y = i, color = 'r', linestyle = '--', alpha = 0.5)
-ax.set(ylabel = 'Water Table Depth (Filled) [m]')
-plt.savefig("figures/data-cleaning/thresholds.pdf")
+#Original Plot
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(bby_daily.TS_4, bby_daily.FCH4_F, alpha = 0.5) #8 cm below the surface
+plt.xlabel("Air Temperature [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
 
+#Curve fitting must remove nan rows
+bby_daily_na = bby_daily[["TS_4", "FCH4_F"]].dropna().reset_index(drop = True)
+x = bby_daily_na.TS_4
+y = bby_daily_na.FCH4_F
 
-'''Run on the water table data'''
-storage_N = pd.DataFrame(np.zeros((len(WTD_sample), len(thresh))))
+#Fit exponential curve to the data
+popt, pcov = curve_fit(lambda t, a, b: np.exp(-a* (1 / t) + b), x, y)
+a = popt[0]
+b = popt[1]
 
-for i in range(0, len(thresh)):
-    #Threshold
-    t = thresh[i]
-    
-    #Calculate values
-    k1_p, k2_p, N = switch_param(WTD_sample, t)
-    
-    #Save switching rates
-    
-    
-    #Save derived noise
-    storage_N[i] = N
-    
-#%%
-'''Plot the derived noise time series'''
+#Fitted Data
+y_fitted = np.exp(-a* (1 / x) + b)
 
-fig, ax = plt.subplots(len(thresh), 1, figsize=(8, 5))
-    
-for i in range(0, len(thresh)):
-    ax[i].step(x = storage_N.index, y = storage_N[i])
-    ax[i].set(xlim = (0, len(WTD_sample)))
-    ax[i].set(ylim = (- 1.25, 1.25))
-    ax[i].set(xlabel = 'Time [Day]') 
-    ax[i].text(0, -1.75, str(thresh[i]) + "m", fontsize = 8, color = 'black')
-    
-    #Aesthetic
-    ax[i].yaxis.set_visible(False)
-    
-    if i == len(thresh) - 1:
-        ax[i].spines['right'].set_visible(False)
-        ax[i].spines['left'].set_visible(False)
-        ax[i].spines['top'].set_visible(False)
-        ax[i].tick_params(left = False, labelleft = False, bottom = False, labelbottom = False)       
-        ax[i].spines["bottom"].set_position(("axes", -0.3))
-    else:
-        ax[i].set_frame_on(False)
-        ax[i].xaxis.set_visible(False)
+#Fitted Plot
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(bby_daily_na.TS_4, bby_daily_na.FCH4_F, alpha = 0.3)
+plt.scatter(x, y_fitted, color = 'red', marker = '.')
+plt.xlabel("Soil Temperature at 8cm [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
 
-plt.savefig("figures/data-cleaning/derivednoise2.pdf")
+#Methane Flux controlled for temp
+y_norm = y - y_fitted
 
+#Fitted Plot w/ Norm
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(x, y, alpha = 0.3, label = 'original')
+plt.scatter(x, y_fitted, color = 'red', marker = '.', label = 'fitted')
+plt.scatter(x, y_norm, color = 'orange', alpha = 0.3, label = 'normalized')
+plt.xlabel("Soil Temperature at 8cm [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
+plt.legend()
 
+bby_daily["FCH4_F_MODEL"] = np.exp(-a* (1 / bby_daily.TS_4[bby_daily.TS_4 > 0]) + b)
+bby_daily["FCH4_F_NORM"] = bby_daily.FCH4_F - bby_daily.FCH4_F_MODEL
 
+#Modelled and Actual CH4
+fig, ax1 = plt.subplots(figsize = (10, 8))
+ax1.plot(bby_daily.TIMESTAMP, bby_daily.FCH4_F, color = 'lightgray')
+ax1.set(ylabel = 'Turbulent Ch4 Flux (Measured, Filled) [m day-1]')
+
+ax2 = ax1.twinx()
+ax2.plot(bby_daily.TIMESTAMP, bby_daily.FCH4_F_MODEL, color = 'orange')
+ax2.set(ylabel = 'Turbulent CH4 Flux (Modelled, Filled) [nmolCH4 m-2 s-1]')
+
+#Save
+bby_daily.to_csv('data/cleaned/JP-BBY_normalized.csv')
+# %%
+'''NZ-KOP'''
+'''Import Data'''
+folder_path = "data/FLUXNET/NZ-KOP/"
+
+kop_daily = pd.read_csv(folder_path + 'FLX_NZ-KOP_FLUXNET-CH4_DD_2012-2015_1-1.csv', 
+                        parse_dates = ['TIMESTAMP'], 
+                        na_values = (-9999))
+
+'''Sample Plot'''
+fig, ax1 = plt.subplots(figsize = (10, 8))
+ax1.plot(kop_daily.TIMESTAMP, kop_daily.WTD_F, color = 'lightgray')
+ax1.set(ylabel = 'Water Table Depth (Filled) [m]')
+
+ax2 = ax1.twinx()
+ax2.plot(kop_daily.TIMESTAMP, kop_daily.FCH4_F, color = 'orange')
+ax2.set(ylabel = 'Turbulent CH4 Flux (Filled) [nmolCH4 m-2 s-1]')
+
+#Original Plot
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(kop_daily.TS_3, kop_daily.FCH4_F, alpha = 0.5) #8 cm below the surface
+plt.xlabel("Air Temperature [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
+
+#Curve fitting must remove nan rows
+kop_daily_na = kop_daily[["TS_3", "FCH4_F"]].dropna().reset_index(drop = True)
+x = kop_daily_na.TS_3
+y = kop_daily_na.FCH4_F
+
+#Fit exponential curve to the data
+popt, pcov = curve_fit(lambda t, a, b: np.exp(-a* (1 / t) + b), x, y)
+a = popt[0]
+b = popt[1]
+
+#Fitted Data
+y_fitted = np.exp(-a* (1 / x) + b)
+
+#Fitted Plot
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(kop_daily_na.TS_3, kop_daily_na.FCH4_F, alpha = 0.3)
+plt.scatter(x, y_fitted, color = 'red', marker = '.')
+plt.xlabel("Soil Temperature at 8cm [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
+
+#Methane Flux controlled for temp
+y_norm = y - y_fitted
+
+#Fitted Plot w/ Norm
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(x, y, alpha = 0.3, label = 'original')
+plt.scatter(x, y_fitted, color = 'red', marker = '.', label = 'fitted')
+plt.scatter(x, y_norm, color = 'orange', alpha = 0.3, label = 'normalized')
+plt.xlabel("Soil Temperature at 8cm [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
+plt.legend()
+
+kop_daily["FCH4_F_MODEL"] = np.exp(-a* (1 / kop_daily.TS_3[kop_daily.TS_3 > 0]) + b)
+kop_daily["FCH4_F_NORM"] = kop_daily.FCH4_F - kop_daily.FCH4_F_MODEL
+
+#Modelled and Actual CH4
+fig, ax1 = plt.subplots(figsize = (10, 8))
+ax1.plot(kop_daily.TIMESTAMP, kop_daily.FCH4_F, color = 'lightgray')
+ax1.set(ylabel = 'Turbulent Ch4 Flux (Measured, Filled) [m day-1]')
+
+ax2 = ax1.twinx()
+ax2.plot(kop_daily.TIMESTAMP, kop_daily.FCH4_F_MODEL, color = 'orange')
+ax2.set(ylabel = 'Turbulent CH4 Flux (Modelled, Filled) [nmolCH4 m-2 s-1]')
+
+#Save
+kop_daily.to_csv('data/cleaned/NZ-KOP_normalized.csv')
+# %%
+'''SE-DEG'''
+'''Import Data'''
+folder_path = "data/FLUXNET/SE-DEG/"
+
+deg_daily = pd.read_csv(folder_path + 'FLX_SE-DEG_FLUXNET-CH4_DD_2014-2018_1-1.csv', 
+                        parse_dates = ['TIMESTAMP'], 
+                        na_values = (-9999))
+
+'''Sample Plot'''
+fig, ax1 = plt.subplots(figsize = (10, 8))
+ax1.plot(deg_daily.TIMESTAMP, deg_daily.WTD_F, color = 'lightgray')
+ax1.set(ylabel = 'Water Table Depth (Filled) [m]')
+
+ax2 = ax1.twinx()
+ax2.plot(deg_daily.TIMESTAMP, deg_daily.FCH4_F, color = 'orange')
+ax2.set(ylabel = 'Turbulent CH4 Flux (Filled) [nmolCH4 m-2 s-1]')
+
+#Original Plot
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(deg_daily.TS_4, deg_daily.FCH4_F, alpha = 0.5) #8 cm below the surface
+plt.xlabel("Air Temperature [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
+
+#Curve fitting must remove nan rows
+deg_daily_na = deg_daily[["TS_4", "FCH4_F"]].dropna().reset_index(drop = True)
+x = deg_daily_na.TS_4
+y = deg_daily_na.FCH4_F
+
+#Fit exponential curve to the data
+popt, pcov = curve_fit(lambda t, a, b: np.exp(-a* (1 / t) + b), x, y)
+a = popt[0]
+b = popt[1]
+
+#Fitted Data
+y_fitted = np.exp(-a* (1 / x) + b)
+
+#Fitted Plot
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(deg_daily_na.TS_4, deg_daily_na.FCH4_F, alpha = 0.3)
+plt.scatter(x, y_fitted, color = 'red', marker = '.')
+plt.xlabel("Soil Temperature at 8cm [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
+
+#Methane Flux controlled for temp
+y_norm = y - y_fitted
+
+#Fitted Plot w/ Norm
+fig, ax1 = plt.subplots(figsize = (6, 6))
+plt.scatter(x, y, alpha = 0.3, label = 'original')
+plt.scatter(x, y_fitted, color = 'red', marker = '.', label = 'fitted')
+plt.scatter(x, y_norm, color = 'orange', alpha = 0.3, label = 'normalized')
+plt.xlabel("Soil Temperature at 8cm [degC]")
+plt.ylabel("CH4 Flux (Filled) [nmolCH4 m-2 s-1]")
+plt.legend()
+
+deg_daily["FCH4_F_MODEL"] = np.exp(-a* (1 / deg_daily.TS_4[deg_daily.TS_4 > 0]) + b)
+deg_daily["FCH4_F_NORM"] = deg_daily.FCH4_F - deg_daily.FCH4_F_MODEL
+
+#Modelled and Actual CH4
+fig, ax1 = plt.subplots(figsize = (10, 8))
+ax1.plot(deg_daily.TIMESTAMP, deg_daily.FCH4_F, color = 'lightgray')
+ax1.set(ylabel = 'Turbulent Ch4 Flux (Measured, Filled) [m day-1]')
+
+ax2 = ax1.twinx()
+ax2.plot(deg_daily.TIMESTAMP, deg_daily.FCH4_F_MODEL, color = 'orange')
+ax2.set(ylabel = 'Turbulent CH4 Flux (Modelled, Filled) [nmolCH4 m-2 s-1]')
+
+#Save
+deg_daily.to_csv('data/cleaned/SE-DEG_normalized.csv')
 # %%

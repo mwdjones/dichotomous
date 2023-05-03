@@ -214,4 +214,30 @@ def calc_rates(noise):
     
     return sol2[0][k1], sol2[0][k2]
 
+def downsample(df, col, step):
+    n = len(df)/step
 
+    #Resampled indexes
+    xresamp = np.arange(min(df[col]), max(df[col])+step, step)
+
+    #set og index
+    df.set_index(col, inplace =True)
+
+    #new df
+    df2 = df.reindex(xresamp)
+
+    #interpolate
+    df_resampled = df2.interpolate('nearest').loc[xresamp].reset_index(drop = False)
+
+    return df_resampled
+
+def ncrosses(series, thresh):
+    count = 0
+    # Iterate over the steps array
+    for i in range(1, len(series)):
+        # Condition to check that the
+        # graph crosses the origin.
+        if ((series[i-1] < thresh and series[i] >= thresh) or (series[i-1] > thresh and series[i] <= thresh)):
+            count += 1
+ 
+    return count
