@@ -224,8 +224,8 @@ for i in range(0, steps):
         
         #Take the average dEdt
         s["dEdt"] = np.concatenate(([0], np.diff(s.Emission)))
-        e_bar = s.dEdt.mean()
-        e_max = s.Emission.max()
+        e_bar = s.dEdt.mean() #Mean emission per day
+        e_max = s.Emission.max() #Max emission per day
 
         #Assign to the grid space
         Z[i, j] = e_bar

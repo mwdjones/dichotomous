@@ -16,7 +16,7 @@ from sympy.solvers import solve
 from functions import *
 
 '''Import Normalized Data'''
-scb_daily = pd.read_csv('data/cleaned/CA-SCB/CA-SCB_normalized.csv')
+scb_daily = pd.read_csv('./data/cleaned/CA-SCB_normalized.csv')
 
 #%%
 '''Params'''

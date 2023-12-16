@@ -23,6 +23,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import datetime as dt
+from scipy import stats
 
 #For solving systems of equations
 import sympy as sp
@@ -51,7 +52,7 @@ a = 1/a_max
 dt = 1
 #%%
 '''(1) Import Normalized Data'''
-sitename = "SE-DEG"
+sitename = "CA-SCB"
 daily = pd.read_csv('data/cleaned/' + sitename + '_normalized.csv')
 
 #%%
@@ -67,7 +68,8 @@ plt.suptitle(sitename)
 #   JP-BBY [all]
 #   NZ-NOP [all]
 #   SE-DEG
-WTD_sample = daily.WTD_F.dropna()
+WTD_sample = daily.WTD_F[516:1247].dropna()
+meth_sample = daily.FCH4_F_NORM[516:1247]
 
 fig, ax = plt.subplots(figsize = (8, 5))
 plt.plot(WTD_sample, zorder = 5, color = 'lightgray')
@@ -76,11 +78,14 @@ plt.suptitle(sitename)
 
 #%%
 '''(4, 5) Pull switching rates from each of the chose thresholds'''
+nbin = 12
+l_limit = -0.25 
+u_limit = 0.05
 #Redefine thresh to increase samples
 #   CA-SCB np.linspace(-0.25, 0.05, 30)
 #   JP-BBY np.linspace(-0.20, 0.15, 30)
 #   NZ-KOP np.linspace(-0.25, -0.05, 30)
-thresh = np.linspace(-0.25, 0.25, 30)
+thresh = np.linspace(l_limit, u_limit, nbin)
 
 #Rerun decomp
 storage_N = pd.DataFrame(np.zeros((len(WTD_sample), len(thresh))))
@@ -148,7 +153,7 @@ fig, ax = plt.subplots(1, 1, figsize=(5, 3))
 ax.plot(thresh_pdf.index, thresh_pdf.Emission, 
            marker = 'o')
 
-ax.set_xlim(-0.25, 0.25)
+ax.set_xlim(l_limit, u_limit)
 ax.set_xlabel('Threshold')
 ax.set_ylabel(r'Average $\frac{dE}{dt}$')
 
@@ -169,4 +174,23 @@ ax.set_ylabel(r'Average $\frac{dE}{dt}$')
 plt.savefig("figures/sites/" + sitename + "_counts.pdf", bbox_inches = 'tight')
 plt.show() 
 
+# %%
+
+'''(9) Plot - binned model/data comparison'''
+bin_means, bin_edges, binnumber = stats.binned_statistic(WTD_sample, meth_sample, statistic = np.nanmean, bins = nbin, range = [l_limit, u_limit])
+
+#Janky ass plot - adjust later
+fig, ax = plt.subplots(1, 1, figsize=(5, 3))
+sns.stripplot(binnumber, meth_sample, alpha = 0.1, color = 'blue', ax = ax)
+ax.plot(bin_means, color='blue', lw=2, marker = 'o', label = 'Raw Data')
+ax.set_ylabel("Turbulent Ch4 Flux (Measured, Filled) [m day-1]", color = 'blue')
+ax.set_xlabel("Threshold number/WTD bin")
+
+ax2 = ax.twinx()
+ax2.plot(range(0, len(thresh)), 10*thresh_pdf.Emission, marker = 'o', color = 'red', label = 'Model Data')
+ax2.set_ylabel('Average dE/day', color = 'red')
+
+#plt.legend()
+
+plt.savefig("figures/sites/" + sitename + "_jankysample.pdf", bbox_inches = 'tight')
 # %%
