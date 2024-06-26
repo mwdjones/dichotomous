@@ -156,6 +156,7 @@ plt.savefig("figures/numSolution.pdf")
 #%%
 '''Empirical PDF and CDF'''
 
+
 ### Empirical cdf
 fig, ax = plt.subplots()
 n, bins, patches = ax.hist(storage.Methane, 50, density = True, histtype = 'step', cumulative = True)
@@ -215,7 +216,7 @@ for i in range(0, steps):
     for j in range(0, steps):
         #print("K1 is " + str(X[i]) + " and K2 is " + str(Y[j]))
         #Generate noise
-        n = generate_noise(X[i], Y[j], 10, dt)
+        n = generate_noise(X[i], Y[j], 30, dt)
         
         #Run numerical solutions
         s = rk4_solve_ma(0.5, 0.5, dt, n, kp = k_p, kox = k_ox, kom = k_om, e = e)

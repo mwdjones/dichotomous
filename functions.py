@@ -241,3 +241,25 @@ def ncrosses(series, thresh):
             count += 1
  
     return count
+
+def crossTime(series, thresh):
+    #Find the time between crosses and then average
+    #Inputs: series - this is the series that will parametrized. In this case a WTE time series (array like)
+    #        thresh - the threshod that will be used to compute the crossing (int)
+    #Output: t_vec - the vector containing the lengths between crosses, len(t_vec) should be the number of crosses
+    #        t - the average time spent before crossing the threshold
+
+    series_norm = series - thresh
+
+    t_vec = []
+    counter = 0
+    for i in range(1, len(series_norm)):
+        sameSign = (series_norm[i - 1] * series_norm[i]) >= 0
+        if(sameSign):
+            counter = counter + 1
+        else:
+            t_vec.append(counter)
+            counter = 0
+
+    return t_vec, np.mean(t_vec)
+

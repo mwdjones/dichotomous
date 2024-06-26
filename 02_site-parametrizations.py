@@ -52,7 +52,7 @@ a = 1/a_max
 dt = 1
 #%%
 '''(1) Import Normalized Data'''
-#site list: "CA-SCB", "DE-Hte", "DE-SfN", "DE-Zrk", "FI-Lom", "FI-Si2", "FR-LGt", "JP-BBY", "NZ-KOP", "SE-DEG", "US-EDN"
+#site list: "CA-SCB", "DE-Hte", "DE-SfN", "DE-Zrk", "FI-Si2", "FI-Sii", "FR-LGt", "JP-BBY", "NZ-KOP", "SE-DEG"
 sitename = "CA-SCB"
 daily = pd.read_csv('data/cleaned/' + sitename + '_normalized.csv')
 
