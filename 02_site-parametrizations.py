@@ -78,7 +78,7 @@ ax.set(ylabel = 'Water Table Depth (Filled) [m]')
 plt.suptitle(sitename)
 
 #%%
-'''(4, 5) Pull switching rates from each of the chose thresholds'''
+'''(4, 5) Pull switching rates from each of the chosen thresholds'''
 nbin = 12
 l_limit = -0.25 
 u_limit = 0.05
@@ -143,6 +143,26 @@ for i in range(0, len(thresh)):
     #Concat
     storage_thresh = pd.concat((storage_thresh, s))
 
+'''(6.5) Linear composition of methane emissions to simulate total emissions signature across all thresholds'''
+
+#reshape 
+storage_thresh_reshaped = pd.pivot(columns = 'Threshold') 
+
+storage_thresh_reshaped['Accumulated'] = storage_thresh_reshaped.sum(axis = 1, skipna = True)
+
+#Plot simulated methane emission trace against measured methane trace
+fig, ax = plt.subplots(1, 1, figsize=(5, 3))
+
+plt.plot(meth_sample, color = 'lightgray')
+ax.set_ylabel("Turbulent Ch4 Flux (Measured, Filled) [m day-1]")
+
+ax2 = ax.twinx()
+plt.plot(storage_thresh_reshaped.Accumulated, color = 'blue')
+ax2.set_ylabel('Estimated Cumulative $\frac{dE}{dt}$', color = 'blue')
+ax.set_xlabel('Time')
+
+plt.savefig("figures/sites/" + sitename + "_methanecomparison.pdf", bbox_inches = 'tight')
+plt.show() 
 
 '''(7) Groupby threshold to get average emission'''
 thresh_pdf = storage_thresh.groupby('Threshold').mean()
