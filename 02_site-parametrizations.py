@@ -145,20 +145,24 @@ for i in range(0, len(thresh)):
 
 '''(6.5) Linear composition of methane emissions to simulate total emissions signature across all thresholds'''
 
+#Round timestamp and aggregate
+storage_thresh['Day'] = np.floor(storage_thresh.Time)
+storage_accumulation = storage_thresh.groupby(['Day', 'Threshold']).mean().reset_index(drop = False)
+
 #reshape 
-storage_thresh_reshaped = pd.pivot(columns = 'Threshold') 
+storage_thresh_reshaped = storage_accumulation.pivot(columns = 'Threshold', values = 'Emission') 
 
 storage_thresh_reshaped['Accumulated'] = storage_thresh_reshaped.sum(axis = 1, skipna = True)
 
 #Plot simulated methane emission trace against measured methane trace
 fig, ax = plt.subplots(1, 1, figsize=(5, 3))
 
-plt.plot(meth_sample, color = 'lightgray')
-ax.set_ylabel("Turbulent Ch4 Flux (Measured, Filled) [m day-1]")
+plt.plot(np.cumsum(meth_sample), color = 'lightgray')
+ax.set_ylabel("Cumulative Turbulent Ch4 Flux (Measured, Filled) [m day-1]")
 
 ax2 = ax.twinx()
 plt.plot(storage_thresh_reshaped.Accumulated, color = 'blue')
-ax2.set_ylabel('Estimated Cumulative $\frac{dE}{dt}$', color = 'blue')
+ax2.set_ylabel(r'Estimated Cumulative $\frac{dE}{dt}$', color = 'blue')
 ax.set_xlabel('Time')
 
 plt.savefig("figures/sites/" + sitename + "_methanecomparison.pdf", bbox_inches = 'tight')
