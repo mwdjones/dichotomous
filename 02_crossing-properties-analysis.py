@@ -84,10 +84,10 @@ for site in sites:
 fig, ax = plt.subplots(figsize = (5, 5))
 
 ax.grid(True)
-ax.scatter(sites_storage.T_avg, sites_storage.CH_avg, color = 'black', zorder = 2)
+ax.scatter(sites_storage.N_crosses, sites_storage.CH_avg, color = 'black', zorder = 2)
 #ax.set_xlim(0, 180)
 ax.set_ylim(-20, 20)
-ax.set_xlabel('Average Crossing Time')
+ax.set_xlabel('Number of Crosses')
 ax.set_ylabel('Average Turbulent CH4 Flux [nmolCH4 m-2 s-1]')
 
 # %%
@@ -158,10 +158,16 @@ sites_storage_window = pd.DataFrame({'Site' : site_wind,
 fig, ax = plt.subplots(figsize = (5, 5))
 
 ax.grid(True)
-sns.scatterplot(sites_storage_window.T_avg, sites_storage_window.CH_avg,
-                 hue = sites_storage_window.Site, zorder = 2)
+sns.relplot(data = sites_storage_window, x = 'T_avg', y = 'CH_avg',
+                 col = 'Site', col_wrap = 3, 
+                 zorder = 2)
 #ax.set_xlim(0, 180)
 #ax.set_ylim(-20, 20)
 ax.set_xlabel('Average Crossing Time')
 ax.set_ylabel('Average Turbulent CH4 Flux [nmolCH4 m-2 s-1]')
+# %%
+
+
+
+
 # %%

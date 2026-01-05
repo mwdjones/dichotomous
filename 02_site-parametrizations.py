@@ -15,6 +15,7 @@ Analysis
 Export
 8. Plot and save
 '''
+#%%
 
 '''Imports'''
 #General python packages
@@ -24,6 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime as dt
 from scipy import stats
+import scipy
 
 #For solving systems of equations
 import sympy as sp
@@ -63,7 +65,6 @@ plt.plot(daily.WTD_F, zorder = 5, color = 'lightgray')
 ax.set(ylabel = 'Water Table Depth (Filled) [m]')
 plt.suptitle(sitename)
 
-#%%
 #Select a bit of WTE data that contains no missing data. 
 #   CA-SCB [516:1247]
 #   JP-BBY [all]
@@ -73,8 +74,13 @@ WTD_sample = daily.WTD_F[516:1247].dropna()
 meth_sample = daily.FCH4_F_NORM[516:1247]
 
 fig, ax = plt.subplots(figsize = (8, 5))
-plt.plot(WTD_sample, zorder = 5, color = 'lightgray')
+ax.plot(WTD_sample, zorder = 5, color = 'lightgray')
+
+ax2 = ax.twinx()
+ax2.plot(meth_sample, zorder = 5, color = 'blue')
+
 ax.set(ylabel = 'Water Table Depth (Filled) [m]')
+ax2.set(ylabel = 'Turbulent Ch4 Flux')
 plt.suptitle(sitename)
 
 #%%
@@ -117,6 +123,7 @@ for i in range(0, len(thresh)):
 derivedK = pd.DataFrame([thresh, k1_values, k2_values, crosses]).transpose()
 derivedK.columns = ['thresholds', 'k1', 'k2', 'crosses']
 
+#%%
 '''(6) Run coupled methane/acetate simulation'''
 #Use the switching rates previously derived
 
@@ -143,26 +150,17 @@ for i in range(0, len(thresh)):
     #Concat
     storage_thresh = pd.concat((storage_thresh, s))
 
+#%%
 '''(6.5) Linear composition of methane emissions to simulate total emissions signature across all thresholds'''
-
-#Round timestamp and aggregate
-storage_thresh['Day'] = np.floor(storage_thresh.Time)
-storage_accumulation = storage_thresh.groupby(['Day', 'Threshold']).mean().reset_index(drop = False)
-
 #reshape 
-storage_thresh_reshaped = storage_accumulation.pivot(columns = 'Threshold', values = 'Emission') 
+storage_thresh_reshaped = storage_thresh.pivot(columns = 'Threshold', values = 'Emission') 
 
 storage_thresh_reshaped['Accumulated'] = storage_thresh_reshaped.sum(axis = 1, skipna = True)
 
 #Plot simulated methane emission trace against measured methane trace
 fig, ax = plt.subplots(1, 1, figsize=(5, 3))
 
-plt.plot(np.cumsum(meth_sample), color = 'lightgray')
-ax.set_ylabel("Cumulative Turbulent Ch4 Flux (Measured, Filled) [m day-1]")
-
-ax2 = ax.twinx()
 plt.plot(storage_thresh_reshaped.Accumulated, color = 'blue')
-ax2.set_ylabel(r'Estimated Cumulative $\frac{dE}{dt}$', color = 'blue')
 ax.set_xlabel('Time')
 
 plt.savefig("figures/sites/" + sitename + "_methanecomparison.pdf", bbox_inches = 'tight')
