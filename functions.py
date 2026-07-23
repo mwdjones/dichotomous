@@ -10,6 +10,9 @@ import scipy
 import sympy as sp
 from sympy.solvers import solve
 
+#############################
+'''Calibration Functions
+
 def calc_corr(x, y, return_slope = False):
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
     
@@ -30,8 +33,9 @@ def calcLCE(obs, mod):
     alpha = np.nanstd(mod)/np.nanstd(obs)
     beta = np.nanmean(mod)/np.nanmean(obs)
     return 1 -np.sqrt(((r*alpha - 1)**2) + ((r/alpha - 1)**2) + (beta - 1)**2)
-    
+'''
 
+#############################
 #############################
 '''Model Functions'''
 
@@ -285,4 +289,3 @@ def crossTime(series, thresh):
             counter = 0
 
     return t_vec, np.mean(t_vec)
-
