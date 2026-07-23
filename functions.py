@@ -4,10 +4,33 @@ import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import scipy
 
 #For solving systems of equations
 import sympy as sp
 from sympy.solvers import solve
+
+def calc_corr(x, y, return_slope = False):
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+    
+    if(return_slope):
+        return slope, r_value**2, p_value
+    else:
+        return r_value**2, p_value
+
+def rvalue(obs, mod):
+    nanmask = np.isfinite(obs)
+    y = obs[nanmask]
+    x = mod[nanmask]
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+    return r_value
+    
+def calcLCE(obs, mod):
+    r = rvalue(obs, mod)
+    alpha = np.nanstd(mod)/np.nanstd(obs)
+    beta = np.nanmean(mod)/np.nanmean(obs)
+    return 1 -np.sqrt(((r*alpha - 1)**2) + ((r/alpha - 1)**2) + (beta - 1)**2)
+    
 
 #############################
 '''Model Functions'''
